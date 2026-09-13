@@ -21,7 +21,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("⚡ Seleccionador Técnico de Estabilizadores Niki")
-st.markdown("Dimensionamiento de capacidad aparente ($kVA$) con asignación de fases ($L1, L2, L3$), balanceo de líneas y motores NEC (NFPA 70).")
+st.markdown("Dimensionamiento de capacidad aparente ($kVA$) con validación estricta de motores trifásicos según red, asignación de fases ($L1, L2, L3$) y norma NEC (NFPA 70).")
 
 # --- TABLAS DE CORRIENTE NOMINAL DE MOTORES DE INDUCCIÓN (NEC) ---
 MOTORES_NEC = {
@@ -29,6 +29,15 @@ MOTORES_NEC = {
     "Monofásico 220V": {"0.5 HP": 4.9, "0.75 HP": 6.9, "1.0 HP": 8.0, "1.5 HP": 10.0, "2.0 HP": 12.0, "3.0 HP": 17.0, "5.0 HP": 28.0, "7.5 HP": 40.0, "10.0 HP": 50.0},
     "Trifásico 220V": {"0.5 HP": 2.2, "0.75 HP": 3.2, "1.0 HP": 4.2, "1.5 HP": 6.0, "2.0 HP": 6.8, "3.0 HP": 9.6, "5.0 HP": 15.2, "7.5 HP": 22.0, "10.0 HP": 28.0, "15.0 HP": 42.0, "20.0 HP": 54.0, "25.0 HP": 68.0, "30.0 HP": 80.0, "40.0 HP": 104.0, "50.0 HP": 130.0, "75.0 HP": 192.0, "100.0 HP": 248.0},
     "Trifásico 480V": {"0.5 HP": 1.1, "0.75 HP": 1.6, "1.0 HP": 2.1, "1.5 HP": 3.0, "2.0 HP": 3.4, "3.0 HP": 4.8, "5.0 HP": 7.6, "7.5 HP": 11.0, "10.0 HP": 14.0, "15.0 HP": 21.0, "20.0 HP": 27.0, "25.0 HP": 34.0, "30.0 HP": 40.0, "40.0 HP": 52.0, "50.0 HP": 65.0, "75.0 HP": 96.0, "100.0 HP": 124.0}
+}
+
+# MATRIZ DE COMPATIBILIDAD DE MOTORES POR SISTEMA DE RED
+MOTORES_PERMITIDOS_POR_RED = {
+    "Monofásico 120V": ["Monofásico 120V"],
+    "220V Monofásico (L1 + L2)": ["Monofásico 120V", "Monofásico 220V"],
+    "Bifásico 120/208V": ["Monofásico 120V", "Monofásico 220V"],
+    "Trifásico 120/208V": ["Monofásico 120V", "Monofásico 220V", "Trifásico 220V"],
+    "Trifásico 277/480V": ["Monofásico 120V", "Monofásico 220V", "Trifásico 480V"]
 }
 
 DATOS_SISTEMA_VOLTAJE = {
@@ -47,7 +56,6 @@ EQUIPOS_PREDETERMINADOS = {
     "Carga General Personalizada": {"valor": 1.00, "unidad": "kVA", "fases": "Monofásica", "fp": 0.80}
 }
 
-# --- CATÁLOGO DE ESTABILIZADORES NIKI ---
 CATALOGO_NIKI = {
     "Monofásico 120V": [
         {"serie": "COL-A", "modelo": "COL-A 5 kVA", "kva": 5.0, "amp": 40},
@@ -131,15 +139,25 @@ if "tabla_cargas" not in st.session_state:
         "Descripción", "Cantidad", "Valor", "Unidad", "Fases Carga", "Línea / Asignación", "FP"
     ])
 
-# --- INGRESO DE CARGAS ---
+# --- INGRESO DE CARGAS CON FILTRADO DE MOTORES PERMITIDOS ---
 st.subheader("📋 Levantamiento de Cargas")
 tab_motores, tab_cargas_gen = st.tabs(["⚙️ Motores Industriales (Norma NEC)", "🔌 Cargas Generales"])
 
+# Filtrar lista de motores compatibles según la red elegida
+motores_opciones_disponibles = MOTORES_PERMITIDOS_POR_RED[sistema_sel]
+
 with tab_motores:
     col_tipo_m, col_hp_m, col_cant_m, col_btn_m = st.columns([2.5, 2, 1, 1.5])
-    with col_tipo_m: tipo_motor_sel = st.selectbox("Configuración de Motor:", list(MOTORES_NEC.keys()))
-    with col_hp_m: hp_sel = st.selectbox("Potencia Nominal (HP):", list(MOTORES_NEC[tipo_motor_sel].keys()))
-    with col_cant_m: cant_m = st.number_input("Cantidad:", min_value=1, value=1, step=1, key="cant_m_in")
+    
+    with col_tipo_m:
+        tipo_motor_sel = st.selectbox("Configuración de Motor:", motores_opciones_disponibles)
+    
+    with col_hp_m:
+        hp_sel = st.selectbox("Potencia Nominal (HP):", list(MOTORES_NEC[tipo_motor_sel].keys()))
+    
+    with col_cant_m:
+        cant_m = st.number_input("Cantidad:", min_value=1, value=1, step=1, key="cant_m_in")
+        
     with col_btn_m:
         st.write(""); st.write("")
         if st.button("➕ Agregar Motor", use_container_width=True):
@@ -204,9 +222,13 @@ cargas_editadas = st.data_editor(
 
 st.session_state.tabla_cargas = cargas_editadas
 
-# --- MOTOR DE CÁLCULO Y BALANCEO DE FASES ---
+# --- MOTOR DE CÁLCULO Y VALIDACIÓN DE INCOMPATIBILIDAD ---
 v_info = DATOS_SISTEMA_VOLTAJE[sistema_sel]
 num_fases_red = v_info["fases"]
+
+# Verificar si hay cargas trifásicas agregadas cuando la red NO es trifásica
+tiene_carga_trifasica = any(row.get("Fases Carga") == "Trifásica" for _, row in cargas_editadas.iterrows())
+error_red_incompatible = (num_fases_red < 3) and tiene_carga_trifasica
 
 kva_l1, kva_l2, kva_l3 = 0.0, 0.0, 0.0
 total_kva_directo = 0.0
@@ -219,7 +241,6 @@ for _, row in cargas_editadas.iterrows():
     asig_linea = row.get("Línea / Asignación", "Auto / Balanceada")
     fp = row.get("FP", 0.8)
 
-    # Convertir valor unitario a kVA
     if unidad == "kVA": kva_unitario = val
     elif unidad == "kW": kva_unitario = (val / fp) if fp > 0 else val
     elif unidad == "A":
@@ -233,14 +254,12 @@ for _, row in cargas_editadas.iterrows():
     kva_total_item = kva_unitario * cant
     total_kva_directo += kva_total_item
 
-    # Distribución por fase crítica
     if num_fases_red == 1:
         kva_l1 += kva_total_item
     elif num_fases_red == 2:
         if asig_linea == "L1": kva_l1 += kva_total_item
         elif asig_linea == "L2": kva_l2 += kva_total_item
         else:
-            # Auto / Balanceada con factor 1.15
             por_fase = (kva_total_item / 2.0) * 1.15
             kva_l1 += por_fase; kva_l2 += por_fase
     elif num_fases_red == 3:
@@ -248,11 +267,9 @@ for _, row in cargas_editadas.iterrows():
         elif asig_linea == "L2": kva_l2 += kva_total_item
         elif asig_linea == "L3": kva_l3 += kva_total_item
         else:
-            # Auto / Balanceada con factor 1.15
             por_fase = (kva_total_item / 3.0) * 1.15
             kva_l1 += por_fase; kva_l2 += por_fase; kva_l3 += por_fase
 
-# Determinar fase crítica y kVA equivalente
 if num_fases_red == 1:
     fase_critica_kva = kva_l1
     total_kva_equivalente = kva_l1
@@ -267,31 +284,30 @@ f_desc = obtener_factor_desclasificacion(sistema_sel, v_medido)
 f_res = 1.0 + (margen_reserva / 100.0)
 kva_objetivo = (total_kva_equivalente * f_res) / f_desc if f_desc > 0 else 0.0
 
-# --- MÉTRICAS DE RESUMEN Y ESTADO DE BALANCEO ---
+# --- MÉTRICAS Y ALERTAS ---
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Carga Instalada Directa", f"{total_kva_directo:.2f} kVA")
 c2.metric("Demanda Balanceada Equiv.", f"{total_kva_equivalente:.2f} kVA")
 c3.metric("Factor Desclasificación", f"{f_desc * 100:.1f}%")
 c4.metric("Demanda Objetivo Niki", f"{kva_objetivo:.2f} kVA")
 
-# Alerta de desbalance
-if num_fases_red > 1 and total_kva_directo > 0:
+if num_fases_red > 1 and total_kva_directo > 0 and not error_red_incompatible:
     lineas_vals = [kva_l1, kva_l2] if num_fases_red == 2 else [kva_l1, kva_l2, kva_l3]
     val_max, val_min = max(lineas_vals), min(lineas_vals)
     pct_desbalance = ((val_max - val_min) / val_max * 100) if val_max > 0 else 0
-
-    st.markdown(f"**Distribución de Carga por Fase:** L1 = `{kva_l1:.2f} kVA` | L2 = `{kva_l2:.2f} kVA`" + (f" | L3 = `{kva_l3:.2f} kVA`" if num_fases_red == 3 else ""))
-    
+    st.markdown(f"**Distribución por Fase:** L1 = `{kva_l1:.2f} kVA` | L2 = `{kva_l2:.2f} kVA`" + (f" | L3 = `{kva_l3:.2f} kVA`" if num_fases_red == 3 else ""))
     if pct_desbalance > 20:
-        st.warning(f"⚠️ **Desbalance de fases detectado ({pct_desbalance:.1f}%):** La línea crítica requiere que el estabilizador se dimensione a **{total_kva_equivalente:.2f} kVA** para evitar disparos por sobrecorriente. Considera redistribuir los circuitos en el tablero.")
+        st.warning(f"⚠️ **Desbalance de fases detectado ({pct_desbalance:.1f}%):** El estabilizador se dimensiona a **{total_kva_equivalente:.2f} kVA** según la línea más cargada.")
 
 st.divider()
 
-# --- RECOMENDACIÓN DE MODELO NIKI ---
+# --- RECOMENDACIÓN CON VALIDACIÓN TÉCNICA BLOQUEANTE ---
 st.subheader("🎯 Selección de Estabilizador Niki")
 
-if total_kva_directo == 0.0:
-    st.info("💡 La lista de cargas está vacía. Selecciona un motor o carga general arriba para realizar el cálculo.")
+if error_red_incompatible:
+    st.error(f"⛔ **Error de Configuración Electrotécnica:** Se han detectado cargas o motores **Trifásicos** en la lista, pero el sistema de red seleccionado (**{sistema_sel}**) es Monofásico/Bifásico. Los motores trifásicos no pueden operar sin red trifásica. Elimina las cargas trifásicas o cambia la red a un sistema Trifásico 120/208V o 277/480V.")
+elif total_kva_directo == 0.0:
+    st.info("💡 La lista de cargas está vacía. Selecciona un motor o carga general arriba para calcular el equipo requerido.")
 elif f_desc == 0.0:
     st.error(f"❌ Tensión fuera de rango operativo seguro ({v_medido}V).")
 else:
