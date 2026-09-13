@@ -8,54 +8,69 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilos CSS personalizados (Nomenclatura y diseño Must/Bluetti)
+# Estilos CSS personalizados
 st.markdown("""
     <style>
-    .metric-container { background-color: #F8FAFC; padding: 15px; border-radius: 8px; border: 1px solid #E2E8F0; }
     .card-optimal { background-color: #ECFDF5; padding: 18px; border-radius: 10px; border-left: 6px solid #10B981; margin-bottom: 15px; }
     .card-expansion { background-color: #EFF6FF; padding: 18px; border-radius: 10px; border-left: 6px solid #3B82F6; margin-bottom: 15px; }
     .card-warning { background-color: #FEF3C7; padding: 18px; border-radius: 10px; border-left: 6px solid #F59E0B; margin-bottom: 15px; }
     .badge-optimal { background-color: #10B981; color: white; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px; }
-    .badge-alert { background-color: #F59E0B; color: white; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px; }
+    .badge-alert { background-color: #3B82F6; color: white; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px; }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("⚡ Seleccionador Técnico de Estabilizadores Niki")
-st.markdown("Dimensionamiento dinámico en kVA con desclasificación por caídas de tensión ($F_{\\text{desc}}$) y motor de selección multinivel.")
+st.markdown("Dimensionamiento de capacidad aparente (kVA) con catálogo predeterminado de equipos y desclasificación por tensión en red.")
 
-# --- CATÁLOGO DE EQUIPOS NIKI ---
+# --- CATÁLOGO PRESET DE EQUIPOS DISPONIBLES ---
+EQUIPOS_PREDETERMINADOS = {
+    "Nevera / Refrigerador Doméstico": {"potencia": 0.40, "unidad": "kW", "fp": 0.80},
+    "Cava Cuarto / Freezer Comercial": {"potencia": 1.50, "unidad": "kW", "fp": 0.75},
+    "Aire Acondicionado 12,000 BTU": {"potencia": 1.20, "unidad": "kW", "fp": 0.85},
+    "Aire Acondicionado 18,000 BTU": {"potencia": 1.80, "unidad": "kW", "fp": 0.85},
+    "Aire Acondicionado 24,000 BTU": {"potencia": 2.40, "unidad": "kW", "fp": 0.85},
+    "Bomba de Agua 1 HP": {"potencia": 1.10, "unidad": "kVA", "fp": 0.80},
+    "Bomba de Agua 2 HP": {"potencia": 2.20, "unidad": "kVA", "fp": 0.80},
+    "Iluminación LED General": {"potencia": 0.30, "unidad": "kW", "fp": 0.95},
+    "Puesto de Trabajo (PC + Monitores)": {"potencia": 0.50, "unidad": "kVA", "fp": 0.90},
+    "Servidor / Rack IT": {"potencia": 2.00, "unidad": "kVA", "fp": 0.95},
+    "Microondas / Horno Eléctrico": {"potencia": 1.20, "unidad": "kW", "fp": 0.95},
+    "Carga Personalizada": {"potencia": 1.00, "unidad": "kVA", "fp": 0.80}
+}
+
+# --- CATÁLOGO DE ESTABILIZADORES NIKI ---
 CATALOGO_NIKI = {
     "Monofásico 120V": [
-        {"serie": "COL-A", "modelo": "COL-A 5 kVA", "kva": 5.0, "amp": 40, "pdf": "COL-A_5kVA.pdf"},
-        {"serie": "COL-A", "modelo": "COL-A 10 kVA", "kva": 10.0, "amp": 80, "pdf": "COL-A_10kVA.pdf"},
-        {"serie": "COL-B", "modelo": "COL-B 5 kVA", "kva": 5.0, "amp": 40, "pdf": "COL-B_5kVA.pdf"},
-        {"serie": "COL-B", "modelo": "COL-B 10 kVA", "kva": 10.0, "amp": 80, "pdf": "COL-B_10kVA.pdf"},
+        {"serie": "COL-A", "modelo": "COL-A 5 kVA", "kva": 5.0, "amp": 40},
+        {"serie": "COL-A", "modelo": "COL-A 10 kVA", "kva": 10.0, "amp": 80},
+        {"serie": "COL-B", "modelo": "COL-B 5 kVA", "kva": 5.0, "amp": 40},
+        {"serie": "COL-B", "modelo": "COL-B 10 kVA", "kva": 10.0, "amp": 80},
     ],
     "220V Monofásico (L1 + L2)": [
-        {"serie": "COL115", "modelo": "COL115 5 kVA", "kva": 5.0, "amp": 21, "pdf": "COL115_5kVA.pdf"},
-        {"serie": "COL115", "modelo": "COL115 10 kVA", "kva": 10.0, "amp": 43, "pdf": "COL115_10kVA.pdf"},
-        {"serie": "COL115", "modelo": "COL115 20 kVA", "kva": 20.0, "amp": 86, "pdf": "COL115_20kVA.pdf"},
+        {"serie": "COL115", "modelo": "COL115 5 kVA", "kva": 5.0, "amp": 21},
+        {"serie": "COL115", "modelo": "COL115 10 kVA", "kva": 10.0, "amp": 43},
+        {"serie": "COL115", "modelo": "COL115 20 kVA", "kva": 20.0, "amp": 86},
     ],
     "Bifásico 120/208V": [
-        {"serie": "TND/S", "modelo": "TND/S 10 kVA", "kva": 10.0, "amp": 40, "pdf": "TNDS_10kVA.pdf"},
-        {"serie": "TND/S", "modelo": "TND/S 30 kVA", "kva": 30.0, "amp": 120, "pdf": "TNDS_30kVA.pdf"},
-        {"serie": "TND/S", "modelo": "TND/S 50 kVA", "kva": 50.0, "amp": 200, "pdf": "TNDS_50kVA.pdf"},
+        {"serie": "TND/S", "modelo": "TND/S 10 kVA", "kva": 10.0, "amp": 40},
+        {"serie": "TND/S", "modelo": "TND/S 30 kVA", "kva": 30.0, "amp": 120},
+        {"serie": "TND/S", "modelo": "TND/S 50 kVA", "kva": 50.0, "amp": 200},
     ],
     "Trifásico 120/208V": [
-        {"serie": "TNSA-U", "modelo": "TNSA-U 30 kVA", "kva": 30.0, "amp": 75, "pdf": "TNSA_30kVA.pdf"},
-        {"serie": "TNSA-U", "modelo": "TNSA-U 50 kVA", "kva": 50.0, "amp": 130, "pdf": "TNSA_50kVA.pdf"},
-        {"serie": "TNSA-U", "modelo": "TNSA-U 100 kVA", "kva": 100.0, "amp": 260, "pdf": "TNSA_100kVA.pdf"},
-        {"serie": "TNSA-U", "modelo": "TNSA-U 150 kVA", "kva": 150.0, "amp": 390, "pdf": "TNSA_150kVA.pdf"},
-        {"serie": "TNSA-U", "modelo": "TNSA-U 200 kVA", "kva": 200.0, "amp": 520, "pdf": "TNSA_200kVA.pdf"},
+        {"serie": "TNSA-U", "modelo": "TNSA-U 30 kVA", "kva": 30.0, "amp": 75},
+        {"serie": "TNSA-U", "modelo": "TNSA-U 50 kVA", "kva": 50.0, "amp": 130},
+        {"serie": "TNSA-U", "modelo": "TNSA-U 100 kVA", "kva": 100.0, "amp": 260},
+        {"serie": "TNSA-U", "modelo": "TNSA-U 150 kVA", "kva": 150.0, "amp": 390},
+        {"serie": "TNSA-U", "modelo": "TNSA-U 200 kVA", "kva": 200.0, "amp": 520},
     ],
     "Trifásico 277/480V": [
-        {"serie": "TNSB-U", "modelo": "TNSB-U 100 kVA", "kva": 100.0, "amp": 110, "pdf": "TNSB_100kVA.pdf"},
-        {"serie": "TNSB-U", "modelo": "TNSB-U 150 kVA", "kva": 150.0, "amp": 165, "pdf": "TNSB_150kVA.pdf"},
-        {"serie": "TNSB-U", "modelo": "TNSB-U 200 kVA", "kva": 200.0, "amp": 220, "pdf": "TNSB_200kVA.pdf"},
+        {"serie": "TNSB-U", "modelo": "TNSB-U 100 kVA", "kva": 100.0, "amp": 110},
+        {"serie": "TNSB-U", "modelo": "TNSB-U 150 kVA", "kva": 150.0, "amp": 165},
+        {"serie": "TNSB-U", "modelo": "TNSB-U 200 kVA", "kva": 220.0, "amp": 220},
     ]
 }
 
-# --- FUNCIONES DE DESCLASIFICACIÓN ---
+# --- FUNCIONES TÉCNICAS ---
 def obtener_factor_desclasificacion(sistema, v_medido):
     if sistema == "Monofásico 120V":
         if v_medido >= 108: return 1.0
@@ -90,9 +105,8 @@ def evaluar_estado_carga(pct_carga):
     else:
         return "👍 Carga Aceptable", "#F59E0B"
 
-# --- SIDEBAR: PARÁMETROS DE ENTORNOS ---
-st.sidebar.header("⚙️ Configuración Eléctrica")
-
+# --- SIDEBAR: CONFIGURACIÓN ELÉCTRICA ---
+st.sidebar.header("⚙️ Parámetros de Red")
 sistema_sel = st.sidebar.selectbox("Configuración de Red", list(CATALOGO_NIKI.keys()))
 
 voltajes_def = {
@@ -104,33 +118,62 @@ voltajes_def = {
 }
 
 v_nom, v_min_lim, v_max_lim = voltajes_def[sistema_sel]
-v_medido = st.sidebar.number_input("Voltaje Mínimo Medido en Sitio (V)", min_value=v_min_lim, max_value=v_max_lim, value=v_nom)
-margen_reserva = st.sidebar.slider("Margen de Reserva / Seguridad (%)", min_value=0, max_value=50, value=25, step=5)
+v_medido = st.sidebar.number_input("Voltaje Mínimo Medido (V)", min_value=v_min_lim, max_value=v_max_lim, value=v_nom)
+margen_reserva = st.sidebar.slider("Margen de Reserva (%)", min_value=0, max_value=50, value=25, step=5)
 
-# --- PANEL DE CARGAS INTERACTIVO ---
-st.subheader("📋 Levantar Cuadro de Cargas")
+# --- PANEL DE SELECCIÓN Y EDICIÓN DE CARGAS ---
+st.subheader("📋 Levantamiento y Selección de Cargas")
 
-if "cargas" not in st.session_state:
-    st.session_state.cargas = pd.DataFrame([
-        {"Descripción": "Circuito Principal", "Cantidad": 1, "Potencia": 8.0, "Unidad": "kVA", "FP": 0.8}
+# Inicialización del DataFrame en session_state
+if "tabla_cargas" not in st.session_state:
+    st.session_state.tabla_cargas = pd.DataFrame([
+        {"Descripción": "Aire Acondicionado 18,000 BTU", "Cantidad": 1, "Potencia": 1.80, "Unidad": "kW", "FP": 0.85},
+        {"Descripción": "Iluminación LED General", "Cantidad": 1, "Potencia": 0.30, "Unidad": "kW", "FP": 0.95}
     ])
 
-cargas_df = st.data_editor(
-    st.session_state.cargas,
+# Selector para agregar equipos desde la librería
+col_sel, col_cant, col_btn = st.columns([3, 1, 1])
+
+with col_sel:
+    equipo_nuevo = st.selectbox("Seleccionar equipo de la librería:", list(EQUIPOS_PREDETERMINADOS.keys()))
+
+with col_cant:
+    cant_nueva = st.number_input("Cantidad:", min_value=1, value=1, step=1)
+
+with col_btn:
+    st.write("") # Espaciador
+    st.write("")
+    if st.button("➕ Agregar", use_container_width=True):
+        datos_eq = EQUIPOS_PREDETERMINADOS[equipo_nuevo]
+        nueva_fila = pd.DataFrame([{
+            "Descripción": equipo_nuevo,
+            "Cantidad": cant_nueva,
+            "Potencia": datos_eq["potencia"],
+            "Unidad": datos_eq["unidad"],
+            "FP": datos_eq["fp"]
+        }])
+        st.session_state.tabla_cargas = pd.concat([st.session_state.tabla_cargas, nueva_fila], ignore_index=True)
+        st.rerun()
+
+# Tabla interactiva con edición directa
+cargas_editadas = st.data_editor(
+    st.session_state.tabla_cargas,
     num_rows="dynamic",
     column_config={
         "Descripción": st.column_config.TextColumn("Equipo / Circuito"),
         "Cantidad": st.column_config.NumberColumn("Cantidad", min_value=1, default=1),
-        "Potencia": st.column_config.NumberColumn("Potencia Unitaria", min_value=0.1, default=1.0, format="%.2f"),
+        "Potencia": st.column_config.NumberColumn("Potencia Unitaria", min_value=0.01, default=1.0, format="%.2f"),
         "Unidad": st.column_config.SelectboxColumn("Unidad", options=["kVA", "kW"], default="kVA"),
-        "FP": st.column_config.NumberColumn("FP", min_value=0.5, max_value=1.0, default=0.8, format="%.2f")
+        "FP": st.column_config.NumberColumn("Factor de Potencia (FP)", min_value=0.5, max_value=1.0, default=0.8, format="%.2f")
     },
     use_container_width=True
 )
 
-# --- CÁLCULO DE POTENCIA APARENTE ---
+st.session_state.tabla_cargas = cargas_editadas
+
+# --- CÁLCULO DE POTENCIA APARENTE TOTAL ---
 total_kva_carga = 0.0
-for _, row in cargas_df.iterrows():
+for _, row in cargas_editadas.iterrows():
     cant = row.get("Cantidad", 1)
     pot = row.get("Potencia", 0.0)
     unidad = row.get("Unidad", "kVA")
@@ -141,29 +184,26 @@ f_desc = obtener_factor_desclasificacion(sistema_sel, v_medido)
 f_res = 1.0 + (margen_reserva / 100.0)
 kva_objetivo = (total_kva_carga * f_res) / f_desc if f_desc > 0 else 0.0
 
-# --- MÉTRICAS PRINCIPALES ---
+# --- MÉTRICAS DE RESUMEN ---
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Carga Instalada Directa", f"{total_kva_carga:.2f} kVA")
-c2.metric("Reserva Comercial", f"+{margen_reserva}%")
+c2.metric("Margen Aplicado", f"+{margen_reserva}%")
 c3.metric("Factor Desclasificación", f"{f_desc * 100:.1f}%")
 c4.metric("Demanda Objetivo Niki", f"{kva_objetivo:.2f} kVA")
 
 st.divider()
 
-# --- MOTOR DE SELECCIÓN INTELIGENTE (LOGICA MUST/BLUETTI) ---
-st.subheader("🎯 Alternativas Recomendadas")
+# --- RECOMENDACIÓN DE EQUIPOS ---
+st.subheader("🎯 Selección de Estabilizador Niki")
 
 if f_desc == 0.0:
     st.error(f"❌ Tensión fuera de rango operativo seguro ({v_medido}V).")
 else:
     cat = CATALOGO_NIKI[sistema_sel]
-    # Filtrar modelos aptos (Capacidad >= Demanda Objetivo)
     aptos = [m for m in cat if m["kva"] >= kva_objetivo]
-    
-    # Aplicar filtro inteligente de sobredimensionamiento (Máximo 2.5x la demanda objetivo)
     aptos_filtrados = [m for m in aptos if m["kva"] <= (kva_objetivo * 2.5)]
     if not aptos_filtrados and aptos:
-        aptos_filtrados = [aptos[0]]  # Si todos superan 2.5x, tomar la opción más pequeña disponible
+        aptos_filtrados = [aptos[0]]
 
     if aptos_filtrados:
         modelo_optimo = aptos_filtrados[0]
@@ -173,7 +213,6 @@ else:
 
         col_opt, col_exp = st.columns(2)
 
-        # CARD 1: MODELO ÓPTIMO RECOMENDADO
         with col_opt:
             st.markdown(f"""
                 <div class="card-optimal">
@@ -190,7 +229,6 @@ else:
                 </div>
             """, unsafe_allow_html=True)
 
-        # CARD 2: MODELO PARA EXPANSIÓN (SI EXISTE UN MODELO SUPERIOR EN FILTRADOS)
         with col_exp:
             idx_opt = cat.index(modelo_optimo)
             if idx_opt + 1 < len(cat):
@@ -215,16 +253,14 @@ else:
                 """, unsafe_allow_html=True)
             else:
                 st.info("ℹ️ El modelo óptimo es la máxima capacidad comercial disponible para esta serie.")
-
     else:
         st.markdown(f"""
             <div class="card-warning">
                 <h3>⚠️ Capacidad Requerida Excede Catálogo Estándar</h3>
-                <p>La carga ajustada de <b>{kva_objetivo:.2f} kVA</b> supera la capacidad del modelo individual más grande para la serie seleccionada.</p>
+                <p>La carga ajustada de <b>{kva_objetivo:.2f} kVA</b> supera el modelo individual más grande.</p>
             </div>
         """, unsafe_allow_html=True)
 
-    # --- TABLA COMPARATIVA COMPLETA ---
     st.subheader("📊 Matriz de Evaluación de la Serie")
     df_eval = pd.DataFrame(cat)
     df_eval["Capacidad Efectiva (kVA)"] = df_eval["kva"] * f_desc
