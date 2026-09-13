@@ -20,7 +20,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("⚡ Seleccionador Técnico de Estabilizadores Niki")
-st.markdown("Dimensionamiento de capacidad aparente (kVA) con catálogo predeterminado de equipos y desclasificación por tensión en red.")
+st.markdown("Dimensionamiento de capacidad aparente (kVA) con tabla de cargas dinámicamente editable y desclasificación por tensión de red.")
 
 # --- CATÁLOGO PRESET DE EQUIPOS DISPONIBLES ---
 EQUIPOS_PREDETERMINADOS = {
@@ -70,7 +70,7 @@ CATALOGO_NIKI = {
     ]
 }
 
-# --- FUNCIONES TÉCNICAS ---
+# --- FUNCIONES DE INTERPOLACIÓN DE CURVAS ---
 def obtener_factor_desclasificacion(sistema, v_medido):
     if sistema == "Monofásico 120V":
         if v_medido >= 108: return 1.0
@@ -105,7 +105,7 @@ def evaluar_estado_carga(pct_carga):
     else:
         return "👍 Carga Aceptable", "#F59E0B"
 
-# --- SIDEBAR: CONFIGURACIÓN ELÉCTRICA ---
+# --- SIDEBAR: PARÁMETROS DE RED ---
 st.sidebar.header("⚙️ Parámetros de Red")
 sistema_sel = st.sidebar.selectbox("Configuración de Red", list(CATALOGO_NIKI.keys()))
 
@@ -121,8 +121,9 @@ v_nom, v_min_lim, v_max_lim = voltajes_def[sistema_sel]
 v_medido = st.sidebar.number_input("Voltaje Mínimo Medido (V)", min_value=v_min_lim, max_value=v_max_lim, value=v_nom)
 margen_reserva = st.sidebar.slider("Margen de Reserva (%)", min_value=0, max_value=50, value=25, step=5)
 
-# --- PANEL DE SELECCIÓN Y EDICIÓN DE CARGAS ---
-st.subheader("📋 Levantamiento y Selección de Cargas")
+# --- PANEL DE SELECCIÓN Y EDICIÓN COMPLETA DE CARGAS ---
+st.subheader("📋 Levantamiento y Edición de Cargas")
+st.caption("💡 Puedes hacer doble clic sobre cualquier campo de la tabla para editar el nombre, la cantidad, la potencia o el factor de potencia directamente.")
 
 # Inicialización del DataFrame en session_state
 if "tabla_cargas" not in st.session_state:
@@ -141,9 +142,9 @@ with col_cant:
     cant_nueva = st.number_input("Cantidad:", min_value=1, value=1, step=1)
 
 with col_btn:
-    st.write("") # Espaciador
     st.write("")
-    if st.button("➕ Agregar", use_container_width=True):
+    st.write("")
+    if st.button("➕ Agregar a la Tabla", use_container_width=True):
         datos_eq = EQUIPOS_PREDETERMINADOS[equipo_nuevo]
         nueva_fila = pd.DataFrame([{
             "Descripción": equipo_nuevo,
@@ -155,16 +156,17 @@ with col_btn:
         st.session_state.tabla_cargas = pd.concat([st.session_state.tabla_cargas, nueva_fila], ignore_index=True)
         st.rerun()
 
-# Tabla interactiva con edición directa
+# Tabla interactiva totalmente modificable
 cargas_editadas = st.data_editor(
     st.session_state.tabla_cargas,
     num_rows="dynamic",
+    key="editor_cargas",
     column_config={
-        "Descripción": st.column_config.TextColumn("Equipo / Circuito"),
-        "Cantidad": st.column_config.NumberColumn("Cantidad", min_value=1, default=1),
-        "Potencia": st.column_config.NumberColumn("Potencia Unitaria", min_value=0.01, default=1.0, format="%.2f"),
+        "Descripción": st.column_config.TextColumn("Equipo / Circuito (Editable)", help="Haz doble clic para cambiar el nombre"),
+        "Cantidad": st.column_config.NumberColumn("Cantidad", min_value=1, step=1, default=1),
+        "Potencia": st.column_config.NumberColumn("Potencia Unitaria", min_value=0.01, step=0.1, default=1.0, format="%.2f"),
         "Unidad": st.column_config.SelectboxColumn("Unidad", options=["kVA", "kW"], default="kVA"),
-        "FP": st.column_config.NumberColumn("Factor de Potencia (FP)", min_value=0.5, max_value=1.0, default=0.8, format="%.2f")
+        "FP": st.column_config.NumberColumn("Factor de Potencia (FP)", min_value=0.5, max_value=1.0, step=0.05, default=0.8, format="%.2f")
     },
     use_container_width=True
 )
@@ -193,7 +195,7 @@ c4.metric("Demanda Objetivo Niki", f"{kva_objetivo:.2f} kVA")
 
 st.divider()
 
-# --- RECOMENDACIÓN DE EQUIPOS ---
+# --- RECOMENDACIÓN DE EQUIPOS NIKI ---
 st.subheader("🎯 Selección de Estabilizador Niki")
 
 if f_desc == 0.0:
